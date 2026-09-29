@@ -1,5 +1,47 @@
 # @aws-blocks/bb-kv-store
 
+## 0.2.1
+
+### Patch Changes
+
+- 5454763: fix(bb-kv-store): align `delete()` conditional detection with the mock and `put()`
+  
+  The AWS `delete()` path detected the value-equality condition with
+  `'ifValueEquals' in conditions` (key presence), while the mock and AWS `put()`
+  use `!== undefined`. Two consequences, both mock↔AWS parity breaks:
+  
+  - `delete(key, { ifValueEquals: undefined })` was a silent no-op on the mock but,
+    on AWS, emitted `#value = :expected` with `:expected = JSON.stringify(undefined)`
+    (`undefined`) — a DynamoDB DocumentClient marshalling error instead of an
+    unconditional delete.
+  - The `if/else if` applied only `attribute_exists(#pk)` when both `ifExists` and
+    `ifValueEquals` were set, silently dropping the value check — so on AWS the
+    item was deleted regardless of its value, while the mock (correctly) required
+    both.
+  
+  `delete()` conditions are now composed conjunctively (`attribute_exists(#pk) AND
+  #value = :expected`) with `!== undefined` detection, matching the mock branch-for-
+  branch. Added `parity.test.ts` cases asserting the `DeleteCommand` shape for each
+  combination (value-only, exists-only, both, none, explicit `undefined` no-op, and
+  `null` as a real condition).
+- 757d4a9: feat(core): forward the native client user-agent into the AWS SDK user agent
+  
+  Native runtimes send `x-blocks-user-agent: aws-blocks-<lang>/<version>` on the RPC
+  request. `@aws-blocks/core` validates it against a strict grammar (length-capped,
+  dropped silently when malformed), carries it per request in an `AsyncLocalStorage`,
+  and exports `installClientUserAgent`, an SDK middleware that appends the validated
+  token to the outgoing user agent. The 12 participating Building Blocks install it,
+  so native attribution rides the SDK user-agent chain AWS service telemetry already
+  counts. The Kotlin runtime already sends the header, so Kotlin
+  callers are attributed as soon as this ships; Swift and Dart follow.
+- Updated dependencies [5501cb6]
+- Updated dependencies [d4b32f2]
+- Updated dependencies [27646ac]
+- Updated dependencies [757d4a9]
+- Updated dependencies [465a002]
+  - @aws-blocks/core@0.6.0
+  - @aws-blocks/bb-logger@0.2.1
+
 ## 0.2.0
 
 ### Minor Changes

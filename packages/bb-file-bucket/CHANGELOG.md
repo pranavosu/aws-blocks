@@ -1,5 +1,52 @@
 # @aws-blocks/bb-file-bucket
 
+## 0.2.2
+
+### Patch Changes
+
+- fa0406b: Refactor: extract FileBucket's synth-time option guards (unsafe-CORS wildcard, `noncurrentVersionExpirationDays` format) into a shared `validation.ts` (`validateFileBucketOptions`) called by both the CDK and mock constructors. Previously each constructor carried a verbatim copy of the guards; a single source of truth keeps mock↔CDK parity from drifting. No behavior change — the same combinations are rejected with identical messages on both paths. Follows the `bb-app-setting` pattern (#584); refs #590.
+- 251aed2: fix(bb-file-bucket): align unknown-`versionId` behavior between the mock and AWS
+  
+  On a versioned bucket, an unknown `versionId` diverged between runtimes. S3 does
+  **not** signal an unknown `versionId` as `NoSuchVersion` (verified against real
+  S3): an id it cannot resolve comes back as `InvalidArgument` ("Invalid version id
+  specified") on `GetObject`/`DeleteObject` and `InvalidRequest` on `CopyObject`;
+  `NoSuchVersion` is reserved for a well-formed id that no longer exists. The AWS
+  runtime now normalizes all of these so the observable contract matches the mock:
+  
+  - `get()` — returns `null` for an unknown `versionId` (matching the mock and
+    `get()`'s documented "null if it does not exist" contract), instead of throwing.
+  - `delete()` — is a silent no-op for an unknown `versionId` (matching the mock),
+    instead of throwing.
+  - `restoreVersion()` — throws a clean, matchable `FileBucketErrors.VersionNotFound`
+    (`NoSuchVersion`) via core's `blocksError` producer, so both `.name`
+    (`isBlocksError(e, FileBucketErrors.VersionNotFound)`) and the `.message` agree
+    across runtimes — instead of the raw S3 error, whose enumerable `$metadata`
+    (request IDs, ARNs) would leak to the client on serialization.
+  
+  The raw S3 codes are folded only when a `versionId` was actually supplied, so an
+  unrelated `InvalidArgument`/`InvalidRequest` still surfaces. Also adds the public
+  `FileBucketErrors.VersionNotFound` constant, and encodes the caller-supplied
+  `versionId` in `CopySource` (a value with `&`, `#`, `?`, or a space would
+  otherwise corrupt the `x-amz-copy-source` header).
+- 757d4a9: feat(core): forward the native client user-agent into the AWS SDK user agent
+  
+  Native runtimes send `x-blocks-user-agent: aws-blocks-<lang>/<version>` on the RPC
+  request. `@aws-blocks/core` validates it against a strict grammar (length-capped,
+  dropped silently when malformed), carries it per request in an `AsyncLocalStorage`,
+  and exports `installClientUserAgent`, an SDK middleware that appends the validated
+  token to the outgoing user agent. The 12 participating Building Blocks install it,
+  so native attribution rides the SDK user-agent chain AWS service telemetry already
+  counts. The Kotlin runtime already sends the header, so Kotlin
+  callers are attributed as soon as this ships; Swift and Dart follow.
+- Updated dependencies [5501cb6]
+- Updated dependencies [d4b32f2]
+- Updated dependencies [27646ac]
+- Updated dependencies [757d4a9]
+- Updated dependencies [465a002]
+  - @aws-blocks/core@0.6.0
+  - @aws-blocks/bb-logger@0.2.1
+
 ## 0.2.1
 
 ### Patch Changes

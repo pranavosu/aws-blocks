@@ -1,5 +1,27 @@
 # @aws-blocks/bb-email-client
 
+## 0.1.8
+
+### Patch Changes
+
+- 757d4a9: feat(core): forward the native client user-agent into the AWS SDK user agent
+  
+  Native runtimes send `x-blocks-user-agent: aws-blocks-<lang>/<version>` on the RPC
+  request. `@aws-blocks/core` validates it against a strict grammar (length-capped,
+  dropped silently when malformed), carries it per request in an `AsyncLocalStorage`,
+  and exports `installClientUserAgent`, an SDK middleware that appends the validated
+  token to the outgoing user agent. The 12 participating Building Blocks install it,
+  so native attribution rides the SDK user-agent chain AWS service telemetry already
+  counts. The Kotlin runtime already sends the header, so Kotlin
+  callers are attributed as soon as this ships; Swift and Dart follow.
+- Updated dependencies [5501cb6]
+- Updated dependencies [d4b32f2]
+- Updated dependencies [27646ac]
+- Updated dependencies [757d4a9]
+- Updated dependencies [465a002]
+  - @aws-blocks/core@0.6.0
+  - @aws-blocks/bb-logger@0.2.1
+
 ## 0.1.7
 
 ### Patch Changes

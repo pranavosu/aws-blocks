@@ -1,5 +1,18 @@
 # @aws-blocks/bb-cron-job
 
+## 0.2.2
+
+### Patch Changes
+
+- Updated dependencies [5501cb6]
+- Updated dependencies [d4b32f2]
+- Updated dependencies [27646ac]
+- Updated dependencies [757d4a9]
+- Updated dependencies [465a002]
+  - @aws-blocks/core@0.6.0
+  - @aws-blocks/bb-lambda-compute@0.5.1
+  - @aws-blocks/bb-logger@0.2.1
+
 ## 0.2.1
 
 ### Patch Changes

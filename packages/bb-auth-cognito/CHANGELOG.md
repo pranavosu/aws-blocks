@@ -1,5 +1,35 @@
 # @aws-blocks/bb-auth-cognito
 
+## 0.1.11
+
+### Patch Changes
+
+- 4456fd7: Document the full `AuthState` shape returned by `getAuthState()`/`setAuthState()` (`errorName`, `retriable`, and the `confirmingSignIn` state) in the auth READMEs, and note that `bb-auth-cognito` / `bb-auth-oidc` consumers import the type from `@aws-blocks/auth-common`.
+- 757d4a9: feat(core): forward the native client user-agent into the AWS SDK user agent
+  
+  Native runtimes send `x-blocks-user-agent: aws-blocks-<lang>/<version>` on the RPC
+  request. `@aws-blocks/core` validates it against a strict grammar (length-capped,
+  dropped silently when malformed), carries it per request in an `AsyncLocalStorage`,
+  and exports `installClientUserAgent`, an SDK middleware that appends the validated
+  token to the outgoing user agent. The 12 participating Building Blocks install it,
+  so native attribution rides the SDK user-agent chain AWS service telemetry already
+  counts. The Kotlin runtime already sends the header, so Kotlin
+  callers are attributed as soon as this ships; Swift and Dart follow.
+- Updated dependencies [4456fd7]
+- Updated dependencies [fac0e75]
+- Updated dependencies [0e18d5b]
+- Updated dependencies [5501cb6]
+- Updated dependencies [d4b32f2]
+- Updated dependencies [27646ac]
+- Updated dependencies [5454763]
+- Updated dependencies [757d4a9]
+- Updated dependencies [465a002]
+  - @aws-blocks/auth-common@0.1.9
+  - @aws-blocks/bb-app-setting@0.3.1
+  - @aws-blocks/core@0.6.0
+  - @aws-blocks/bb-kv-store@0.2.1
+  - @aws-blocks/bb-logger@0.2.1
+
 ## 0.1.10
 
 ### Patch Changes

@@ -1,5 +1,22 @@
 # @aws-blocks/create-blocks-app
 
+## 0.1.24
+
+### Patch Changes
+
+- bbd2c13: Front-load the scaffolded `AGENTS.md` with the framework model an agent needs before building.
+  
+  The scaffolded `AGENTS.md` previously pointed coding agents at the block docs folder and let them rediscover the framework wiring on every project. It now states the load-bearing facts inline: the backend-defines / frontend-imports-the-same-name client model (and the "don't import `index.ts` directly" pitfall), method namespacing (`namespace.method`), auth via `requireAuth` + the `@aws-blocks/blocks/ui` components, that the deployed frontend discovers the API through `/.blocks-sandbox/config.json` (no hardcoded URL), and a minimal end-to-end example. The full docs pointer is retained for depth. Reduces the doc-reading and wiring-discovery an agent does to get a first API call working.
+- aeca8e6: Make the Next.js template run its local frontend with webpack so `npm run dev` renders the scaffolded app correctly with local Blocks workspace packages, and make the template e2e test start the dev server itself.
+- e034e20: Make scaffolded starter e2e tests resilient to replacing the sample API.
+  
+  Six templates' `test/e2e.test.ts` (bare, backend, auth-cognito, demo, default, react) previously asserted against the sample API by name (`greet`, the KV `setValue`/`getValue`, or the todo CRUD suite). Removing or renaming that sample API — the first thing most projects do — immediately left a freshly-scaffolded app with a failing test before any real code was written. Each of these templates now ships an always-on, sample-API-independent readiness assertion that checks `/.blocks-sandbox/config.json`, so a fresh scaffold is validated end to end even before you touch the sample API. The sample-API assertions still run and assert against the shipped sample API, with a comment telling you to update or delete them when you replace it. The `default`/`react` readiness loops also stop depending on the sample auth API. Complements the readiness-loop decoupling shipped earlier.
+- 4794cb8: create-blocks-app now scaffolds a fresh project into a directory that contains only benign metadata files (VCS, editor, and OS entries) or an INSTRUCTIONS.md seed, instead of aborting. Any other pre-existing file (including a README.md or .gitignore) still blocks scaffolding, and the error now lists each conflicting entry — so no existing file is overwritten.
+- ca3b54a: Document the single RPC endpoint in the scaffolded `AGENTS.md` and the `react`, `default`, and `bare` template READMEs.
+  
+  These files told agents not to curl the API but never gave the request shape, so agents that needed to verify a deployed app guessed per-namespace paths (`/aws-blocks/authApi`) and got 404s. They now state that every namespace shares `POST /aws-blocks/api` with the namespace in the JSON-RPC `method` field, show a curl example, and cover error handling and the session cookie. The guidance to prefer the typed client and `npm run test:e2e` is unchanged.
+- 465a002: fix(telemetry): use ci-info for CI detection so Taskcluster (`TASK_ID` + `RUN_ID`), Netlify, Vercel, and 40+ other CI providers are identified; also keep the previously checked `CODEBUILD_BUILD_ID`, `JENKINS_URL`, `BITBUCKET_BUILD_NUMBER` and `TASKCLUSTER_ROOT_URL` variables, and honor `CI=false`
+
 ## 0.1.23
 
 ### Patch Changes

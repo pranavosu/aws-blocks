@@ -1,5 +1,144 @@
 # @aws-blocks/blocks
 
+## 0.6.1
+
+### Patch Changes
+
+- 8da1d1f: feat(bb-agent): compute-agnostic client streaming API — `createChat` + `realtimeTransport`
+  
+  Adds a redesigned client streaming surface that hides the runtime behind a single
+  transport seam, so the same frontend code works across runtimes:
+  
+  - `createChat({ transport, api })` — the client API. The common case is one call
+    (`chat.sendMessage('Hello')`); subscribe and run are fused so the
+    subscribe-before-send race can't surface. The flexible primitives `run()`
+    (produce) and `subscribe()` (consume) are exposed for fan-out, observer-only
+    attach, and decoupled produce/consume.
+  - `realtimeTransport(...)` — the Lambda + Realtime implementation of the
+    `ChatTransport` seam. Configure it once; call sites never name the runtime. A
+    future runtime supplies a different transport; nothing else on the client changes.
+  
+  Additive and non-breaking. The `stream()` / `getChannel()` / `resume()` server
+  methods are unchanged (the new transport is built on them). Only the `useChat`
+  client hook is now marked `@deprecated`, superseded by `createChat`.
+- 773cef2: fix(astro): allow an empty `dist/client` for pure-SSR builds
+  
+  A server/hybrid Astro app with no static assets — no `public/` files and no
+  prerendered pages — produces an empty `dist/client`. The adapter treated that as
+  a missing build output and threw `AstroBuildOutputMissingError`, blocking synth
+  and deploy. `dist/server/entry.mjs` is the real required artifact; an empty (or
+  absent) `dist/client` is valid, since CloudFront routes every request to the SSR
+  Lambda. The adapter now requires only the server entry and ensures `dist/client`
+  exists (creating it when absent, with a build-log breadcrumb) instead of failing.
+- ea5f91c: fix(bb-auth-basic): echo the username on the confirm-signup / confirm-reset forms
+  
+  AuthBasic's `confirmingSignUp` and `confirmingPasswordReset` states rendered
+  `username` as an empty, visible text field — so after signing up (or requesting a
+  reset) the user had to **retype** their username on the confirmation step, and a
+  mismatch silently broke the flow. The username is now echoed as a **hidden**
+  field prefilled with the value just entered (mirroring `bb-auth-cognito`), so the
+  confirm form carries it automatically. The `code` / `password` / `newPassword`
+  fields are unchanged.
+- 4456fd7: Document the full `AuthState` shape returned by `getAuthState()`/`setAuthState()` (`errorName`, `retriable`, and the `confirmingSignIn` state) in the auth READMEs, and note that `bb-auth-cognito` / `bb-auth-oidc` consumers import the type from `@aws-blocks/auth-common`.
+- d4b32f2: Add `README.md` and `DESIGN.md` to `@aws-blocks/create-block` and ship them in the published package (`files`), matching the first-party package convention.
+  
+  Tidy two `extract-ts-types` test nits (test/comment only, no runtime change): replace a redundant re-assert with a direct check of the documented lingering-bare-key behavior, and link the array/tuple & nested-destructuring boundary to its tracking issue (#552).
+- 251aed2: fix(bb-file-bucket): align unknown-`versionId` behavior between the mock and AWS
+  
+  On a versioned bucket, an unknown `versionId` diverged between runtimes. S3 does
+  **not** signal an unknown `versionId` as `NoSuchVersion` (verified against real
+  S3): an id it cannot resolve comes back as `InvalidArgument` ("Invalid version id
+  specified") on `GetObject`/`DeleteObject` and `InvalidRequest` on `CopyObject`;
+  `NoSuchVersion` is reserved for a well-formed id that no longer exists. The AWS
+  runtime now normalizes all of these so the observable contract matches the mock:
+  
+  - `get()` — returns `null` for an unknown `versionId` (matching the mock and
+    `get()`'s documented "null if it does not exist" contract), instead of throwing.
+  - `delete()` — is a silent no-op for an unknown `versionId` (matching the mock),
+    instead of throwing.
+  - `restoreVersion()` — throws a clean, matchable `FileBucketErrors.VersionNotFound`
+    (`NoSuchVersion`) via core's `blocksError` producer, so both `.name`
+    (`isBlocksError(e, FileBucketErrors.VersionNotFound)`) and the `.message` agree
+    across runtimes — instead of the raw S3 error, whose enumerable `$metadata`
+    (request IDs, ARNs) would leak to the client on serialization.
+  
+  The raw S3 codes are folded only when a `versionId` was actually supplied, so an
+  unrelated `InvalidArgument`/`InvalidRequest` still surfaces. Also adds the public
+  `FileBucketErrors.VersionNotFound` constant, and encodes the caller-supplied
+  `versionId` in `CopySource` (a value with `&`, `#`, `?`, or a space would
+  otherwise corrupt the `x-amz-copy-source` header).
+- dae7a86: fix(hosting): warn when a compute resource pins an end-of-life Node.js runtime
+  
+  `resolveRuntime` still accepts an explicitly pinned `nodejs18.x` or `nodejs20.x`
+  (so an existing/deployed function isn't hard-broken at synth), but both are past
+  their AWS Lambda deprecation dates (Node 18: Apr 2025; Node 20: Apr 2026). It now
+  emits a CDK synth-time **deprecation warning** for those runtimes, pointing at
+  `nodejs22.x` / `nodejs24.x` (or omitting the runtime to use the default). A
+  supported runtime, or omitting it, warns nothing; the accepted set and the
+  hard error for unrecognized runtimes are unchanged.
+- 5454763: fix(bb-kv-store): align `delete()` conditional detection with the mock and `put()`
+  
+  The AWS `delete()` path detected the value-equality condition with
+  `'ifValueEquals' in conditions` (key presence), while the mock and AWS `put()`
+  use `!== undefined`. Two consequences, both mock↔AWS parity breaks:
+  
+  - `delete(key, { ifValueEquals: undefined })` was a silent no-op on the mock but,
+    on AWS, emitted `#value = :expected` with `:expected = JSON.stringify(undefined)`
+    (`undefined`) — a DynamoDB DocumentClient marshalling error instead of an
+    unconditional delete.
+  - The `if/else if` applied only `attribute_exists(#pk)` when both `ifExists` and
+    `ifValueEquals` were set, silently dropping the value check — so on AWS the
+    item was deleted regardless of its value, while the mock (correctly) required
+    both.
+  
+  `delete()` conditions are now composed conjunctively (`attribute_exists(#pk) AND
+  #value = :expected`) with `!== undefined` detection, matching the mock branch-for-
+  branch. Added `parity.test.ts` cases asserting the `DeleteCommand` shape for each
+  combination (value-only, exists-only, both, none, explicit `undefined` no-op, and
+  `null` as a real condition).
+- 465a002: fix(telemetry): use ci-info for CI detection so Taskcluster (`TASK_ID` + `RUN_ID`), Netlify, Vercel, and 40+ other CI providers are identified; also keep the previously checked `CODEBUILD_BUILD_ID`, `JENKINS_URL`, `BITBUCKET_BUILD_NUMBER` and `TASKCLUSTER_ROOT_URL` variables, and honor `CI=false`
+- Updated dependencies [8da1d1f]
+- Updated dependencies [773cef2]
+- Updated dependencies [ea5f91c]
+- Updated dependencies [4456fd7]
+- Updated dependencies [fac0e75]
+- Updated dependencies [3fac52c]
+- Updated dependencies [0e18d5b]
+- Updated dependencies [5501cb6]
+- Updated dependencies [d4b32f2]
+- Updated dependencies [27646ac]
+- Updated dependencies [fa0406b]
+- Updated dependencies [251aed2]
+- Updated dependencies [dae7a86]
+- Updated dependencies [5454763]
+- Updated dependencies [757d4a9]
+- Updated dependencies [b0be240]
+- Updated dependencies [f1d2cd5]
+- Updated dependencies [465a002]
+  - @aws-blocks/bb-agent@0.5.0
+  - @aws-blocks/hosting@0.4.0
+  - @aws-blocks/bb-auth-basic@0.1.10
+  - @aws-blocks/auth-common@0.1.9
+  - @aws-blocks/bb-auth-cognito@0.1.11
+  - @aws-blocks/bb-auth-oidc@0.2.1
+  - @aws-blocks/bb-app-setting@0.3.1
+  - @aws-blocks/core@0.6.0
+  - @aws-blocks/bb-file-bucket@0.2.2
+  - @aws-blocks/bb-kv-store@0.2.1
+  - @aws-blocks/bb-async-job@0.2.2
+  - @aws-blocks/bb-data@0.3.1
+  - @aws-blocks/bb-distributed-table@0.2.1
+  - @aws-blocks/bb-email-client@0.1.8
+  - @aws-blocks/bb-knowledge-base@0.2.5
+  - @aws-blocks/bb-realtime@0.3.0
+  - @aws-blocks/bb-distributed-data@0.2.1
+  - @aws-blocks/bb-cron-job@0.2.2
+  - @aws-blocks/bb-dashboard@0.2.1
+  - @aws-blocks/bb-lambda-compute@0.5.1
+  - @aws-blocks/bb-logger@0.2.1
+  - @aws-blocks/bb-metrics@0.1.8
+  - @aws-blocks/bb-tracer@0.2.1
+
 ## 0.6.0
 
 ### Minor Changes

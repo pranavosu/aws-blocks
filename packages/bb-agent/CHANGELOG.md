@@ -1,5 +1,54 @@
 # @aws-blocks/bb-agent
 
+## 0.5.0
+
+### Minor Changes
+
+- 8da1d1f: feat(bb-agent): compute-agnostic client streaming API — `createChat` + `realtimeTransport`
+  
+  Adds a redesigned client streaming surface that hides the runtime behind a single
+  transport seam, so the same frontend code works across runtimes:
+  
+  - `createChat({ transport, api })` — the client API. The common case is one call
+    (`chat.sendMessage('Hello')`); subscribe and run are fused so the
+    subscribe-before-send race can't surface. The flexible primitives `run()`
+    (produce) and `subscribe()` (consume) are exposed for fan-out, observer-only
+    attach, and decoupled produce/consume.
+  - `realtimeTransport(...)` — the Lambda + Realtime implementation of the
+    `ChatTransport` seam. Configure it once; call sites never name the runtime. A
+    future runtime supplies a different transport; nothing else on the client changes.
+  
+  Additive and non-breaking. The `stream()` / `getChannel()` / `resume()` server
+  methods are unchanged (the new transport is built on them). Only the `useChat`
+  client hook is now marked `@deprecated`, superseded by `createChat`.
+
+### Patch Changes
+
+- 3fac52c: Tag the Agent's Bedrock SDK clients (`BedrockAgentCoreClient` for AgentCore Runtime invocation and `BedrockClient` for the model health check) with the Blocks user-agent chain, matching the other Building Blocks.
+- 757d4a9: feat(core): forward the native client user-agent into the AWS SDK user agent
+  
+  Native runtimes send `x-blocks-user-agent: aws-blocks-<lang>/<version>` on the RPC
+  request. `@aws-blocks/core` validates it against a strict grammar (length-capped,
+  dropped silently when malformed), carries it per request in an `AsyncLocalStorage`,
+  and exports `installClientUserAgent`, an SDK middleware that appends the validated
+  token to the outgoing user agent. The 12 participating Building Blocks install it,
+  so native attribution rides the SDK user-agent chain AWS service telemetry already
+  counts. The Kotlin runtime already sends the header, so Kotlin
+  callers are attributed as soon as this ships; Swift and Dart follow.
+- Updated dependencies [5501cb6]
+- Updated dependencies [d4b32f2]
+- Updated dependencies [27646ac]
+- Updated dependencies [fa0406b]
+- Updated dependencies [251aed2]
+- Updated dependencies [757d4a9]
+- Updated dependencies [f1d2cd5]
+- Updated dependencies [465a002]
+  - @aws-blocks/core@0.6.0
+  - @aws-blocks/bb-file-bucket@0.2.2
+  - @aws-blocks/bb-distributed-table@0.2.1
+  - @aws-blocks/bb-realtime@0.3.0
+  - @aws-blocks/bb-logger@0.2.1
+
 ## 0.4.1
 
 ### Patch Changes
